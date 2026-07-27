@@ -1,0 +1,6 @@
+{
+  "name": "BME Reference Project",
+  "description": "BME migration workspace and reference repository",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

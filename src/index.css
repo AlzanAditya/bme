@@ -1,0 +1,19 @@
+@import "./styles/variables.css";
+@import "./styles/base.css";
+@import "./styles/layout.css";
+@import "./styles/components.css";
+@import "./styles/theme.css";
+@import "./styles/glass-ui.css";
+@import "./styles/desktop-ui.css";
+@import "./styles/icon-compatibility.css";
+@import "./styles/label-visibility.css";
+
+/* Feature pages */
+@import "./styles/pages/dashboard.css";
+@import "./styles/pages/manual.css";
+@import "./styles/pages/ai.css";
+@import "./styles/pages/ai-multimodal.css";
+@import "./styles/pages/history.css";
+@import "./styles/pages/finance.css";
+@import "./styles/pages/settings.css";
+@import "./styles/pages/sync-dialog.css";
