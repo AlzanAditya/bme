@@ -30,6 +30,11 @@ const MainAppContent: React.FC = () => {
     saveToHistory,
     settings,
     manualEdits,
+    clientName,
+    suratJalanAddress,
+    docDate,
+    showPaymentInfo,
+    docHeaderTitle,
   } = useAppState();
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -44,6 +49,67 @@ const MainAppContent: React.FC = () => {
     setToastMessage(msg);
   };
 
+  // Global Auto-Resize Effect for all Textareas
+  React.useEffect(() => {
+    const resizeTextarea = (ta: HTMLTextAreaElement) => {
+      if (ta.classList.contains('maximized')) return;
+      if (ta.offsetParent === null && ta.scrollHeight === 0) return;
+
+      ta.style.height = 'auto';
+      const scrollH = ta.scrollHeight;
+      if (scrollH > 0) {
+        ta.style.height = `${scrollH}px`;
+      }
+    };
+
+    const resizeAllTextareas = () => {
+      document.querySelectorAll<HTMLTextAreaElement>('textarea').forEach((ta) => {
+        resizeTextarea(ta);
+      });
+    };
+
+    // Initial resize
+    resizeAllTextareas();
+
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && target.tagName === 'TEXTAREA') {
+        resizeTextarea(target as HTMLTextAreaElement);
+      }
+    };
+
+    const handleFocus = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target && target.tagName === 'TEXTAREA') {
+        resizeTextarea(target as HTMLTextAreaElement);
+      }
+    };
+
+    document.addEventListener('input', handleInput);
+    document.addEventListener('focusin', handleFocus);
+
+    const observer = new MutationObserver(() => {
+      resizeAllTextareas();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['value', 'class', 'rows'],
+    });
+
+    window.addEventListener('resize', resizeAllTextareas);
+
+    return () => {
+      document.removeEventListener('input', handleInput);
+      document.removeEventListener('focusin', handleFocus);
+      observer.disconnect();
+      window.removeEventListener('resize', resizeAllTextareas);
+    };
+  }, []);
+
   const currentMode = activeTab?.mode || 'manual';
 
   // Handle Download Logic
@@ -54,8 +120,8 @@ const MainAppContent: React.FC = () => {
     const fmt = formatOverride || settings.defaultDownloadMethod || 'pdf';
     const html =
       type === 'invoice'
-        ? manualEdits.invoice || buildInvoiceHTML(invoiceItems, activeTab?.title)
-        : manualEdits.letter || buildSuratJalanHTML(invoiceItems);
+        ? manualEdits.invoice || buildInvoiceHTML(invoiceItems, activeTab?.title, clientName, showPaymentInfo, docDate, docHeaderTitle)
+        : manualEdits.letter || buildSuratJalanHTML(invoiceItems, clientName, docDate, suratJalanAddress);
 
     const rawTemplate =
       type === 'invoice'
@@ -65,7 +131,8 @@ const MainAppContent: React.FC = () => {
     const filename = formatFileName(rawTemplate, activeTab?.title || 'Draft');
 
     if (fmt === 'pdf') {
-      exportToPDF(html, filename);
+      showAlert(`Mengekspor ${type === 'invoice' ? 'Invoice' : 'Surat Jalan'} ke PDF...`);
+      await exportToPDF(html, filename);
     } else if (fmt === 'png') {
       showAlert(`Mengekspor ${type === 'invoice' ? 'Invoice' : 'Surat Jalan'} ke PNG...`);
       await exportToPNG(html, filename);
@@ -79,8 +146,8 @@ const MainAppContent: React.FC = () => {
   const handleOpenFullPreview = (type: 'invoice' | 'surat') => {
     const html =
       type === 'invoice'
-        ? manualEdits.invoice || buildInvoiceHTML(invoiceItems, activeTab?.title)
-        : manualEdits.letter || buildSuratJalanHTML(invoiceItems);
+        ? manualEdits.invoice || buildInvoiceHTML(invoiceItems, activeTab?.title, clientName, showPaymentInfo, docDate, docHeaderTitle)
+        : manualEdits.letter || buildSuratJalanHTML(invoiceItems, clientName, docDate, suratJalanAddress);
 
     setPreviewModalType(type);
     setPreviewModalHTML(html);
@@ -89,10 +156,16 @@ const MainAppContent: React.FC = () => {
 
   // Open Preview for specific history document
   const handleOpenPreviewHistoryDoc = (doc: HistoryDoc, type: 'invoice' | 'surat') => {
+    const docClientName = doc.clientName || clientName;
+    const docAddress = doc.suratJalanAddress || suratJalanAddress;
+    const docDocDate = doc.docDate !== undefined ? doc.docDate : docDate;
+    const docShowPaymentInfo = doc.showPaymentInfo !== undefined ? doc.showPaymentInfo : showPaymentInfo;
+    const docDocHeaderTitle = doc.docHeaderTitle || docHeaderTitle;
+
     const html =
       type === 'invoice'
-        ? (doc.manualEdits?.invoice || buildInvoiceHTML(doc.items, doc.title))
-        : (doc.manualEdits?.letter || buildSuratJalanHTML(doc.items));
+        ? (doc.manualEdits?.invoice || buildInvoiceHTML(doc.items, doc.title, docClientName, docShowPaymentInfo, docDocDate, docDocHeaderTitle))
+        : (doc.manualEdits?.letter || buildSuratJalanHTML(doc.items, docClientName, docDocDate, docAddress));
 
     setPreviewModalType(type);
     setPreviewModalHTML(html);

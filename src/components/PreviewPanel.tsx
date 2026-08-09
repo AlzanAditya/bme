@@ -18,18 +18,29 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
     previewCollapsed,
     togglePreviewCollapsed,
     manualEdits,
+    clientName,
+    suratJalanAddress,
+    docDate,
+    showPaymentInfo,
+    docHeaderTitle,
   } = useAppState();
 
   const currentMode = activeTab?.mode || 'manual';
   const isPreviewEnabled = currentMode === 'manual' || currentMode === 'ai';
 
   const invoiceHTML = useMemo(() => {
-    return manualEdits.invoice || buildInvoiceHTML(invoiceItems, activeTab?.title);
-  }, [manualEdits.invoice, invoiceItems, activeTab?.title]);
+    return (
+      manualEdits.invoice ||
+      buildInvoiceHTML(invoiceItems, activeTab?.title, clientName, showPaymentInfo, docDate, docHeaderTitle)
+    );
+  }, [manualEdits.invoice, invoiceItems, activeTab?.title, clientName, showPaymentInfo, docDate, docHeaderTitle]);
 
   const suratJalanHTML = useMemo(() => {
-    return manualEdits.letter || buildSuratJalanHTML(invoiceItems);
-  }, [manualEdits.letter, invoiceItems]);
+    return (
+      manualEdits.letter ||
+      buildSuratJalanHTML(invoiceItems, clientName, docDate, suratJalanAddress)
+    );
+  }, [manualEdits.letter, invoiceItems, clientName, docDate, suratJalanAddress]);
 
   const invoiceWrapperRef = useRef<HTMLDivElement>(null);
   const letterWrapperRef = useRef<HTMLDivElement>(null);

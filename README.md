@@ -18,6 +18,3 @@ View your app in AI Studio: https://ai.studio/apps/14b23284-ee9c-4634-b0c0-8408f
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-# bme
-# bme-google
-# BME

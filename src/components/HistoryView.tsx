@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppState } from '../context/StateContext';
 import { HistoryDoc } from '../types';
 import { Icon } from './Icon';
@@ -18,11 +18,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     deleteHistoryItem,
     loadHistoryItemToActiveTab,
     navigateToMode,
+    updateHistoryTitle,
   } = useAppState();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [swipedDocId, setSwipedDocId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
+
+  const touchStartRef = useRef<{ x: number; y: number; docId: string } | null>(null);
 
   const isHistoryView = activeTab?.mode === 'history';
   if (!isHistoryView) return null;
@@ -31,13 +37,48 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
   const filteredHistory = safeHistory.filter((doc) => {
     return (
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.date.includes(searchTerm)
+      (doc.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (doc.date || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
-  const formatCurrency = (val: number) => {
-    return 'Rp ' + new Intl.NumberFormat('id-ID').format(val || 0);
+  const getDataAge = (doc: HistoryDoc) => {
+    const timestamp = doc.createdAt || doc.id;
+    if (!timestamp) return { label: '', cls: '' };
+
+    let itemDate: Date;
+    if (typeof timestamp === 'number') {
+      itemDate = new Date(timestamp);
+    } else if (!isNaN(Number(timestamp))) {
+      itemDate = new Date(Number(timestamp));
+    } else {
+      itemDate = new Date(timestamp);
+    }
+
+    if (isNaN(itemDate.getTime())) return { label: '', cls: '' };
+
+    const now = new Date();
+    const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const itemDay = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate());
+    const diffDays = Math.round((nowDay.getTime() - itemDay.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) return { label: 'Hari ini', cls: 'age-today' };
+    if (diffDays === 1) return { label: 'Kemarin', cls: 'age-yesterday' };
+    if (diffDays <= 7) return { label: `${diffDays} hari lalu`, cls: 'age-week' };
+    if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return { label: weeks === 1 ? 'Minggu lalu' : `${weeks} minggu lalu`, cls: 'age-last-week' };
+    }
+    if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      return { label: months === 1 ? 'Bulan lalu' : `${months} bulan lalu`, cls: 'age-month' };
+    }
+    const years = Math.floor(diffDays / 365);
+    return { label: years === 1 ? 'Tahun lalu' : `${years} tahun lalu`, cls: 'age-year' };
+  };
+
+  const formatPriceNumber = (total: number) => {
+    return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(total || 0);
   };
 
   const handleLoadDoc = (doc: HistoryDoc) => {
@@ -61,6 +102,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       onShowAlert('Histori terpilih berhasil dihapus.');
     }
   };
+
+  const shownAgeLabels = new Set<string>();
 
   return (
     <section id="history-view" className="view active">
@@ -86,9 +129,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             id="btn-multi-select"
             className={`icon-btn ${isMultiSelect ? 'active' : ''}`}
             title="Pilih Semua / Beberapa"
+            style={isMultiSelect ? { color: '#F5A623' } : {}}
             onClick={() => {
               setIsMultiSelect(!isMultiSelect);
               setSelectedIds([]);
+              setSwipedDocId(null);
             }}
           >
             <Icon name="check-done-01" size={17} />
@@ -105,107 +150,254 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
       <div id="history-list" className="history-list">
         {filteredHistory.length === 0 ? (
-          <div
-            className="empty-state-card"
-            style={{ textAlign: 'center', padding: '40px 20px', borderRadius: '12px' }}
-          >
-            <Icon name="hourglass-02" size={32} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
-            <h4 style={{ margin: '0 0 6px 0', color: 'var(--text-main)' }}>Histori Kosong</h4>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Belum ada invoice tersimpan di histori. Simpan invoice dari Manual Mode untuk melihatnya di sini.
-            </p>
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            Tidak ditemukan.
           </div>
         ) : (
-          filteredHistory.map((doc) => {
-            const isSelected = selectedIds.includes(doc.id);
+          filteredHistory.map((doc, idx) => {
+            const age = getDataAge(doc);
+            const badgeLabel = (age.label && !shownAgeLabels.has(age.label)) ? age.label : '';
+            if (age.label) shownAgeLabels.add(age.label);
+
+            const isChecked = selectedIds.includes(doc.id);
+            const isSwiped = swipedDocId === doc.id;
+
             return (
               <div
                 key={doc.id}
-                className={`history-card glass-panel ${isSelected ? 'is-selected' : ''}`}
+                className="item-swipe-container"
                 style={{
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--bg-card)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '10px',
-                  cursor: isMultiSelect ? 'pointer' : 'default',
-                }}
-                onClick={() => {
-                  if (isMultiSelect) toggleSelect(doc.id);
+                  position: 'relative',
+                  overflow: 'hidden',
+                  marginBottom: 0,
+                  borderTop: idx === 0 ? '1px solid var(--border-color)' : undefined,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                  {isMultiSelect && (
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelect(doc.id)}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                    />
-                  )}
-                  <div
+                {/* Swipe Action Buttons Behind */}
+                <div
+                  className="swipe-actions"
+                  style={{
+                    position: 'absolute',
+                    top: '1px',
+                    bottom: 0,
+                    right: 0,
+                    display: 'flex',
+                    zIndex: 1,
+                  }}
+                >
+                  <button
+                    className="swipe-btn swipe-edit-history"
+                    title="Edit di Manual Editor"
                     style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '10px',
-                      backgroundColor: 'rgba(74, 144, 226, 0.1)',
-                      color: 'var(--primary)',
+                      backgroundColor: '#F5A623',
+                      border: 'none',
+                      color: 'white',
+                      padding: '0 20px',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      flexShrink: 0,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLoadDoc(doc);
                     }}
                   >
-                    <Icon name="file-02" size={20} />
-                  </div>
-
-                  <div>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--text-main)' }}>
-                      {doc.title || 'Invoice Tanpa Judul'}
-                    </h4>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {doc.date} • {doc.itemsCount} Item • {formatCurrency(doc.totalAmount)}
-                    </span>
-                  </div>
+                    <Icon name="pencil-01" size={16} />
+                  </button>
+                  <button
+                    className="swipe-btn swipe-delete-history"
+                    title="Hapus Riwayat"
+                    style={{
+                      backgroundColor: '#ff4d4f',
+                      border: 'none',
+                      color: 'white',
+                      padding: '0 20px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Hapus "${doc.title}" dari histori?`)) {
+                        deleteHistoryItem(doc.id);
+                        onShowAlert('Histori telah dihapus.');
+                      }
+                    }}
+                  >
+                    <Icon name="trash-01" size={16} />
+                  </button>
                 </div>
 
-                {!isMultiSelect && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() => handleLoadDoc(doc)}
-                      title="Buka kembali di Manual Editor"
-                    >
-                      <Icon name="edit-02" size={14} />
-                      <span>Edit</span>
-                    </button>
+                {/* History Item Foreground Card */}
+                <div
+                  className={`history-item ${isSwiped ? 'swiped-left' : ''}`}
+                  data-index={idx}
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s',
+                    position: 'relative',
+                    zIndex: 2,
+                    background: 'var(--bg-card)',
+                  }}
+                  onTouchStart={(e) => {
+                    if (isMultiSelect) return;
+                    touchStartRef.current = {
+                      x: e.touches[0].clientX,
+                      y: e.touches[0].clientY,
+                      docId: doc.id,
+                    };
+                  }}
+                  onTouchEnd={(e) => {
+                    if (!touchStartRef.current || touchStartRef.current.docId !== doc.id) return;
+                    const diffX = e.changedTouches[0].clientX - touchStartRef.current.x;
+                    touchStartRef.current = null;
+                    if (diffX < -50) {
+                      setSwipedDocId(doc.id);
+                    } else if (diffX > 50) {
+                      setSwipedDocId(null);
+                    }
+                  }}
+                  onClick={() => {
+                    if (isMultiSelect) {
+                      toggleSelect(doc.id);
+                    } else if (isSwiped) {
+                      setSwipedDocId(null);
+                    } else {
+                      onOpenPreviewDoc(doc, 'invoice');
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                    {isMultiSelect && (
+                      <label
+                        className="history-checkbox-custom"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="history-checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelect(doc.id)}
+                        />
+                        <span className="checkmark"></span>
+                      </label>
+                    )}
 
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() => onOpenPreviewDoc(doc, 'invoice')}
-                      title="Lihat Pratinjau Document"
-                    >
-                      <Icon name="eye" size={14} />
-                      <span>Preview</span>
-                    </button>
-
-                    <button
-                      className="icon-btn danger"
-                      onClick={() => {
-                        if (confirm(`Hapus "${doc.title}" dari histori?`)) {
-                          deleteHistoryItem(doc.id);
-                          onShowAlert('Histori telah dihapus.');
-                        }
+                    <div
+                      className="history-content-wrapper"
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '8px',
                       }}
-                      title="Hapus Histori"
                     >
-                      <Icon name="trash-01" size={16} />
-                    </button>
+                      <div
+                        className="history-left-group"
+                        style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}
+                      >
+                        {editingTitleId === doc.id ? (
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={editingTitleValue}
+                            autoFocus
+                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                if (editingTitleValue.trim()) {
+                                  updateHistoryTitle?.(doc.id, editingTitleValue.trim());
+                                }
+                                setEditingTitleId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingTitleId(null);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (editingTitleValue.trim()) {
+                                updateHistoryTitle?.(doc.id, editingTitleValue.trim());
+                              }
+                              setEditingTitleId(null);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              height: 'auto',
+                              padding: '2px 6px',
+                              fontSize: '0.95rem',
+                              fontWeight: 600,
+                              borderColor: 'var(--primary)',
+                            }}
+                          />
+                        ) : (
+                          <h4
+                            className="history-title-text"
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTitleId(doc.id);
+                              setEditingTitleValue(doc.title || '');
+                            }}
+                            style={{
+                              margin: 0,
+                              fontSize: '0.95rem',
+                              fontWeight: 600,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {doc.title || 'Tanpa Judul'}
+                          </h4>
+                        )}
+                        <span
+                          className="history-info-text"
+                          style={{
+                            fontSize: '0.78rem',
+                            color: 'var(--text-muted)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {doc.date} | {doc.itemsCount || doc.items?.length || 0} Item
+                        </span>
+                      </div>
+
+                      <div
+                        className="history-right-group"
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}
+                      >
+                        <span className={`age-badge ${age.cls}`}>{badgeLabel}</span>
+                        <span
+                          className="history-price-text"
+                          style={{
+                            fontWeight: 700,
+                            color: 'var(--primary)',
+                            fontSize: '0.92rem',
+                            whiteSpace: 'nowrap',
+                            lineHeight: 1,
+                          }}
+                        >
+                          <sup
+                            style={{
+                              fontSize: '0.6em',
+                              fontWeight: 500,
+                              verticalAlign: 'super',
+                              letterSpacing: 0,
+                              opacity: 0.75,
+                            }}
+                          >
+                            Rp
+                          </sup>
+                          {formatPriceNumber(doc.totalAmount)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             );
           })
@@ -213,21 +405,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       </div>
 
       {/* Batch Action Bar */}
-      {isMultiSelect && (
+      {isMultiSelect && selectedIds.length > 0 && (
         <div id="batch-delete-bar" className="batch-delete-bar">
-          <span id="batch-count">{selectedIds.length} dipilih</span>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button
-              id="btn-batch-delete"
-              className="btn btn-sm"
-              style={{ background: '#ff4d4f', color: 'white', border: 'none' }}
-              onClick={handleBatchDelete}
-            >
-              <Icon name="trash-02" size={14} /> Hapus
-            </button>
-          </div>
+          <span id="batch-count" style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+            {selectedIds.length} item terpilih
+          </span>
+          <button
+            id="btn-batch-delete"
+            className="btn btn-sm"
+            style={{ background: '#ff4d4f', color: 'white', border: 'none' }}
+            onClick={handleBatchDelete}
+          >
+            <Icon name="trash-02" size={14} /> Hapus Terpilih
+          </button>
         </div>
       )}
     </section>
   );
 };
+

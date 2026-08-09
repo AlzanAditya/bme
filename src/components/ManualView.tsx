@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppState } from '../context/StateContext';
+import { useAppState, DEFAULT_CLIENT_NAME, DEFAULT_SURAT_JALAN_ADDRESS } from '../context/StateContext';
 import { InvoiceItem } from '../types';
 import { Icon } from './Icon';
 import { InlinePreviewSection } from './InlinePreviewSection';
@@ -37,6 +37,19 @@ export const ManualView: React.FC<ManualViewProps> = ({
     manualCardMode,
     setManualCardMode,
     updateActiveTabTitle,
+    clientName,
+    updateClientName,
+    resetClientName,
+    docDate,
+    updateDocDate,
+    showPaymentInfo,
+    toggleShowPaymentInfo,
+    docHeaderTitle,
+    setDocHeaderTitle,
+    toggleDocHeaderTitle,
+    suratJalanAddress,
+    updateSuratJalanAddress,
+    resetSuratJalanAddress,
   } = useAppState();
 
   const isManualView = activeTab?.mode === 'manual';
@@ -66,17 +79,329 @@ export const ManualView: React.FC<ManualViewProps> = ({
 
   return (
     <section id="manual-view" className="view client-view active">
-      {/* Judul Invoice input */}
-      <div className="input-group item-field-wrap">
-        <label className="field-label">Judul Invoice</label>
-        <input
-          type="text"
-          id="manual-title"
-          className="form-input title"
-          placeholder="Contoh: Invoice #001"
-          value={activeTab?.title || ''}
-          onChange={(e) => updateActiveTabTitle(e.target.value)}
-        />
+      {/* Document Metadata Grid (Judul, Nama Klien, Tanggal, & Info Pembayaran) */}
+      <div
+        className="doc-metadata-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '12px',
+          marginBottom: '12px',
+        }}
+      >
+        {/* Judul Invoice input */}
+        <div className="input-group item-field-wrap" style={{ margin: 0 }}>
+          <label className="field-label">Judul Invoice</label>
+          <input
+            type="text"
+            id="manual-title"
+            className="form-input title"
+            placeholder="Contoh: Invoice #001"
+            value={activeTab?.title || ''}
+            onChange={(e) => updateActiveTabTitle(e.target.value)}
+          />
+        </div>
+
+        {/* Nama Klien Penerima input & Reset button */}
+        <div className="input-group item-field-wrap" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <label className="field-label" style={{ margin: 0 }}>Nama Klien Penerima</label>
+            {clientName !== DEFAULT_CLIENT_NAME && (
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                  fontStyle: 'italic',
+                }}
+              >
+                Custom
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="text"
+              id="client-name-input"
+              className="form-input"
+              placeholder="PT. SARASWANTI INDO GENETECH"
+              value={clientName}
+              onChange={(e) => updateClientName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => {
+                resetClientName();
+                onShowAlert('Nama klien penerima dikembalikan ke default');
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '8px 12px',
+                fontSize: '0.8rem',
+                whiteSpace: 'nowrap',
+                height: '38px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+              title="Reset nama klien penerima ke default (PT. SARASWANTI INDO GENETECH)"
+            >
+              <Icon name="rotate-ccw" size={14} />
+              <span>Reset</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tanggal Dokumen input */}
+        <div className="input-group item-field-wrap" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <label className="field-label" style={{ margin: 0 }}>Tanggal Dokumen</label>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {docDate ? 'Terisi' : 'Kosong (Default)'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="text"
+              id="doc-date-input"
+              className="form-input"
+              placeholder="Kosong (contoh: 10/08/2026)"
+              value={docDate}
+              onChange={(e) => updateDocDate(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            {!docDate ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => {
+                  const today = new Date().toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  });
+                  updateDocDate(today);
+                  onShowAlert(`Tanggal diisi: ${today}`);
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '8px 10px',
+                  fontSize: '0.78rem',
+                  whiteSpace: 'nowrap',
+                  height: '38px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+                title="Isi dengan tanggal hari ini"
+              >
+                <Icon name="calendar" size={14} />
+                <span>Hari Ini</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => {
+                  updateDocDate('');
+                  onShowAlert('Tanggal dokumen dikosongkan');
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '8px 10px',
+                  fontSize: '0.78rem',
+                  whiteSpace: 'nowrap',
+                  height: '38px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+                title="Kosongkan tanggal dokumen"
+              >
+                <Icon name="x" size={14} />
+                <span>Hapus</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Checkbox Toggle Info Pembayaran BCA */}
+        <div className="input-group item-field-wrap" style={{ margin: 0 }}>
+          <label className="field-label" style={{ marginBottom: '4px' }}>Info Pembayaran Invoice</label>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 12px',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              borderRadius: '6px',
+              height: '38px',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+            onClick={toggleShowPaymentInfo}
+          >
+            <input
+              type="checkbox"
+              id="show-payment-info-checkbox"
+              checked={showPaymentInfo}
+              onChange={toggleShowPaymentInfo}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '16px',
+                height: '16px',
+                accentColor: 'var(--primary-color, #e67e22)',
+                cursor: 'pointer',
+              }}
+            />
+            <label
+              htmlFor="show-payment-info-checkbox"
+              style={{
+                fontSize: '0.82rem',
+                color: 'var(--text-main, #2c3e50)',
+                cursor: 'pointer',
+                margin: 0,
+                fontWeight: 500,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              Munculkan Rekening Bank BCA
+            </label>
+          </div>
+        </div>
+
+        {/* Switch Header Judul (INVOICE / PENAWARAN) - Khusus Invoice */}
+        <div className="input-group item-field-wrap" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <label className="field-label" style={{ margin: 0 }}>Header Dokumen (Khusus Invoice)</label>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--primary-color, #e67e22)',
+                fontWeight: 600,
+              }}
+            >
+              {docHeaderTitle}
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: '4px',
+              padding: '3px',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              borderRadius: '6px',
+              height: '38px',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              alignItems: 'center',
+            }}
+          >
+            <button
+              type="button"
+              className={`btn btn-sm ${docHeaderTitle === 'INVOICE' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => {
+                setDocHeaderTitle('INVOICE');
+                onShowAlert('Header dokumen diubah ke INVOICE');
+              }}
+              style={{
+                flex: 1,
+                height: '30px',
+                padding: '0 8px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              INVOICE
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${docHeaderTitle === 'PENAWARAN' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => {
+                setDocHeaderTitle('PENAWARAN');
+                onShowAlert('Header dokumen diubah ke PENAWARAN');
+              }}
+              style={{
+                flex: 1,
+                height: '30px',
+                padding: '0 8px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              PENAWARAN
+            </button>
+          </div>
+        </div>
+
+        {/* Alamat Klien Input (Khusus Surat Jalan) */}
+        <div className="input-group item-field-wrap" style={{ margin: 0, gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <label className="field-label" style={{ margin: 0 }}>Alamat Klien (Khusus Surat Jalan)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {suratJalanAddress !== DEFAULT_SURAT_JALAN_ADDRESS ? 'Diubah' : 'Default'}
+              </span>
+              {suratJalanAddress !== DEFAULT_SURAT_JALAN_ADDRESS && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => {
+                    resetSuratJalanAddress();
+                    onShowAlert('Alamat Surat Jalan dikembalikan ke default');
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    height: '24px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reset ke alamat default"
+                >
+                  <Icon name="rotate-ccw" size={12} />
+                  <span>Reset Alamat</span>
+                </button>
+              )}
+            </div>
+          </div>
+          <textarea
+            id="surat-jalan-address-input"
+            className="form-input"
+            rows={Math.max(3, suratJalanAddress.split('\n').length)}
+            placeholder="Masukkan alamat lengkap untuk Surat Jalan..."
+            value={suratJalanAddress}
+            onChange={(e) => updateSuratJalanAddress(e.target.value)}
+            style={{
+              width: '100%',
+              maxWidth: '360px',
+              fontFamily: 'inherit',
+              fontSize: '0.82rem',
+              lineHeight: '1.45',
+              resize: 'vertical',
+              padding: '8px 10px',
+              borderRadius: '6px',
+            }}
+          />
+        </div>
       </div>
 
       {/* View Toggle Bar (Tampilan Card/Table & Mode Simple/Advance) */}

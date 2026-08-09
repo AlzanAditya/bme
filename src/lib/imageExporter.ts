@@ -1,4 +1,5 @@
 import * as htmlToImage from 'html-to-image';
+import html2pdf from 'html2pdf.js';
 
 export function formatFileName(template: string, title: string) {
   const now = new Date();
@@ -161,15 +162,49 @@ export async function exportToJPEG(htmlString: string, filename: string): Promis
   }
 }
 
-export function exportToPDF(htmlString: string, title: string) {
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.open();
-  w.document.write(htmlString);
-  w.document.close();
-  w.document.title = title || 'Dokumen';
-  setTimeout(() => {
-    w.focus();
-    w.print();
-  }, 300);
+export async function exportToPDF(htmlString: string, filename: string): Promise<boolean> {
+  let iframe: HTMLIFrameElement | null = null;
+  try {
+    await waitForFonts();
+    iframe = await createOffscreenIframe(htmlString);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) throw new Error('Iframe document not accessible');
+
+    const pageContainer = (iframeDoc.querySelector('.page-container') || iframeDoc.body) as HTMLElement;
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const opt = {
+      margin: 0,
+      filename: `${filename}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    // Use html2pdf.js to directly convert HTML to PDF file download
+    const html2pdfFunc = typeof html2pdf === 'function' ? html2pdf : (html2pdf as any).default;
+    await html2pdfFunc().set(opt).from(pageContainer).save();
+    return true;
+  } catch (error) {
+    console.error('html2pdf export failed:', error);
+    try {
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.open();
+        w.document.write(htmlString);
+        w.document.close();
+        w.document.title = filename || 'Dokumen';
+        setTimeout(() => {
+          w.focus();
+          w.print();
+        }, 300);
+      }
+    } catch (e) {
+      alert('Gagal mengekspor ke PDF.');
+    }
+    return false;
+  } finally {
+    if (iframe) removeOffscreenIframe(iframe);
+  }
 }

@@ -47,6 +47,11 @@ export interface AdminProfile {
 export interface HistoryDoc {
   id: string;
   title: string;
+  clientName?: string;
+  suratJalanAddress?: string;
+  docDate?: string;
+  showPaymentInfo?: boolean;
+  docHeaderTitle?: 'INVOICE' | 'PENAWARAN';
   date: string;
   createdAt: number;
   itemsCount: number;

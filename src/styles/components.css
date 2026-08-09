@@ -218,18 +218,39 @@
     opacity: 0.6;
 }
 
-.form-input,
-.form-textarea {
+textarea {
+    field-sizing: content;
+    resize: none;
+    overflow-y: hidden;
+}
+
+.form-input {
     width: 100%;
     height: 46px;
     padding: 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    resize: none;
     background-color: var(--bg-input);
     color: var(--text-main);
     font-weight: 500;
     font-size: 0.95rem;
+    transition: border-color 0.2s;
+}
+
+.form-textarea {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    resize: none;
+    overflow-y: hidden;
+    field-sizing: content;
+    background-color: var(--bg-input);
+    color: var(--text-main);
+    font-weight: 500;
+    font-size: 0.95rem;
+    line-height: 1.4;
     transition: border-color 0.2s;
 }
 

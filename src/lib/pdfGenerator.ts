@@ -1,4 +1,5 @@
 import { InvoiceItem } from '../types';
+import { DEFAULT_SURAT_JALAN_ADDRESS } from '../context/StateContext';
 
 const formatNumber = (num: number) => new Intl.NumberFormat('id-ID').format(num || 0);
 
@@ -347,6 +348,9 @@ const SURAT_JALAN_STYLE = `
 
         .recipient-info {
             line-height: 1.3;
+            max-width: 360px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .recipient-info strong {
@@ -447,7 +451,14 @@ const SURAT_JALAN_STYLE = `
         }
 `;
 
-export const buildInvoiceHTML = (items: InvoiceItem[], _titleName?: string) => {
+export const buildInvoiceHTML = (
+  items: InvoiceItem[],
+  _titleName?: string,
+  clientName: string = 'PT. SARASWANTI INDO GENETECH',
+  showPaymentInfo: boolean = true,
+  docDate: string = '',
+  docHeaderTitle: 'INVOICE' | 'PENAWARAN' = 'INVOICE'
+) => {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   const rows = items
@@ -467,12 +478,18 @@ export const buildInvoiceHTML = (items: InvoiceItem[], _titleName?: string) => {
     })
     .join('');
 
+  const paymentBlock = showPaymentInfo
+    ? `<div class="payment-info">
+            <p>Pembayaran Bisa melalui rekening Bank <strong>BCA 5737162660</strong> a.n SAEPUL IMAN</p>
+        </div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice - Berkah Maju Elektrik</title>
+    <title>${docHeaderTitle} - Berkah Maju Elektrik</title>
     <style>
 ${INVOICE_STYLE}
     </style>
@@ -480,7 +497,7 @@ ${INVOICE_STYLE}
 <body>
     <div class="page-container">
         <div class="header">
-            <h1>INVOICE</h1>
+            <h1>${docHeaderTitle}</h1>
         </div>
 
         <div class="company-info">
@@ -495,11 +512,11 @@ ${INVOICE_STYLE}
             </div>
             <div class="invoice-info-container">
                 <div class="invoice-box">
-                    <p>Tanggal :</p>
+                    <p>Tanggal : ${docDate ? docDate : ''}</p>
                 </div>
                 <div class="invoice-box">
                     <p>Kepada :</p>
-                    <p><strong>PT. SARASWANTI INDO GENETECH</strong></p>
+                    <p><strong>${clientName || 'PT. SARASWANTI INDO GENETECH'}</strong></p>
                 </div>
             </div>
         </div>
@@ -528,9 +545,7 @@ ${rows}
             </div>
         </div>
 
-        <div class="payment-info">
-            <p>Pembayaran Bisa melalui rekening Bank <strong>BCA 5737162660</strong> a.n SAEPUL IMAN</p>
-        </div>
+        ${paymentBlock}
                 
         <div class="footer">
             <p class="hormat-kami">Hormat Kami</p>
@@ -542,7 +557,17 @@ ${rows}
 </html>`;
 };
 
-export const buildSuratJalanHTML = (items: InvoiceItem[]) => {
+export const buildSuratJalanHTML = (
+  items: InvoiceItem[],
+  clientName: string = 'PT. SARASWANTI INDO GENETECH',
+  docDate: string = '',
+  suratJalanAddress: string = DEFAULT_SURAT_JALAN_ADDRESS
+) => {
+  const addressLines = (suratJalanAddress || DEFAULT_SURAT_JALAN_ADDRESS)
+    .split('\n')
+    .map((line) => `<p>${line.trim()}</p>`)
+    .join('');
+
   const rows = items
     .map((item, index) => {
       const prefix = item.tipe === '-' ? '' : 'UPS';
@@ -592,14 +617,11 @@ ${SURAT_JALAN_STYLE}
         <div class="content-info">
             <div class="recipient-info">
                 <p>Kepada Yth.</p>
-                <p><strong>PT. Saraswanti Indo Genetech</strong></p>
-                <p>Jl. Rasamala, Jl. Ring Road Yasmin No. 20,</p>
-                <p>RT.02/RW.03, Curugmekar,</p>
-                <p>Kec. Bogor Barat</p>
-                <p>Kota Bogor 16113</p>
+                <p><strong>${clientName || 'PT. SARASWANTI INDO GENETECH'}</strong></p>
+                ${addressLines}
             </div>
             <div class="date-info">
-                <p>Tanggal : .....................................</p>
+                <p>Tanggal : ${docDate ? docDate : '.....................................'}</p>
             </div>
         </div>
 

@@ -56,6 +56,43 @@ export const FinanceView: React.FC = () => {
     return sortOrder === 'terbaru' ? tB - tA : tA - tB;
   });
 
+  const getDataAge = (doc: any) => {
+    const timestamp = doc.createdAt || doc.id;
+    if (!timestamp) return { label: '', cls: '' };
+
+    let itemDate: Date;
+    if (typeof timestamp === 'number') {
+      itemDate = new Date(timestamp);
+    } else if (!isNaN(Number(timestamp))) {
+      itemDate = new Date(Number(timestamp));
+    } else {
+      itemDate = new Date(timestamp);
+    }
+
+    if (isNaN(itemDate.getTime())) return { label: '', cls: '' };
+
+    const now = new Date();
+    const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const itemDay = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate());
+    const diffDays = Math.round((nowDay.getTime() - itemDay.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) return { label: 'Hari ini', cls: 'age-today' };
+    if (diffDays === 1) return { label: 'Kemarin', cls: 'age-yesterday' };
+    if (diffDays <= 7) return { label: `${diffDays} hari lalu`, cls: 'age-week' };
+    if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return { label: weeks === 1 ? 'Minggu lalu' : `${weeks} minggu lalu`, cls: 'age-last-week' };
+    }
+    if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      return { label: months === 1 ? 'Bulan lalu' : `${months} bulan lalu`, cls: 'age-month' };
+    }
+    const years = Math.floor(diffDays / 365);
+    return { label: years === 1 ? 'Tahun lalu' : `${years} tahun lalu`, cls: 'age-year' };
+  };
+
+  const shownFinanceAgeLabels = new Set<string>();
+
   return (
     <section id="finance-view" className="view active">
       {/* Target & Mode Controls — single row */}
@@ -184,31 +221,39 @@ export const FinanceView: React.FC = () => {
         </div>
         <div id="finance-history-list">
           {sortedHistory.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Belum ada riwayat transaksi.
+            <div style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Tidak ada data
             </div>
           ) : (
-            sortedHistory.map((doc) => (
-              <div
-                key={doc.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '10px 12px',
-                  borderBottom: '1px solid var(--border-color)',
-                  fontSize: '0.85rem',
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{doc.title || 'Invoice'}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{doc.date}</div>
+            sortedHistory.map((doc) => {
+              const age = getDataAge(doc);
+              const badgeLabel = (age.label && !shownFinanceAgeLabels.has(age.label)) ? age.label : '';
+              if (age.label) shownFinanceAgeLabels.add(age.label);
+
+              return (
+                <div key={doc.id} className="history-item" style={{ cursor: 'default' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+                          {doc.title || 'Tanpa Judul'}
+                        </h4>
+                        <span className={`age-badge ${age.cls}`} style={{ flexShrink: 0 }}>{badgeLabel}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {doc.date || ''} | {doc.itemsCount || doc.items?.length || 0} Item
+                        </span>
+                        <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.92rem', whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1 }}>
+                          <sup style={{ fontSize: '0.6em', fontWeight: 500, verticalAlign: 'super', letterSpacing: 0, opacity: 0.75 }}>Rp</sup>
+                          {formatCurrency(doc.totalAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontWeight: 700, color: 'var(--finance-green)' }}>
-                  Rp {formatCurrency(doc.totalAmount)}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

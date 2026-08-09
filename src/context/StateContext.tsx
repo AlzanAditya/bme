@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { InvoiceItem, TabItem, TabMode, AppSettings, HistoryDoc, ItemTemplate, AdminProfile } from '../types';
 import { DEFAULT_ITEM_TEMPLATES } from '../data/itemTemplates';
 
+export const DEFAULT_CLIENT_NAME = 'PT. SARASWANTI INDO GENETECH';
+export const DEFAULT_SURAT_JALAN_ADDRESS = `Jl. Rasamala, Jl. Ring Road Yasmin No. 20,
+RT.02/RW.03, Curugmekar,
+Kec. Bogor Barat
+Kota Bogor 16113`;
+
 const STORAGE_KEYS = {
   TABS: 'bme_tabs',
   ACTIVE_TAB: 'bme_active_tab',
@@ -17,6 +23,11 @@ const STORAGE_KEYS = {
   MANUAL_CARD_MODE: 'bme_manual_card_mode',
   IS_LOGGED_IN: 'bme_is_logged_in',
   ADMIN_PROFILE: 'bme_admin_profile',
+  CLIENT_NAME: 'bme_client_name',
+  SURAT_JALAN_ADDRESS: 'bme_surat_jalan_address',
+  SHOW_PAYMENT_INFO: 'bme_show_payment_info',
+  DOC_DATE: 'bme_doc_date',
+  DOC_HEADER_TITLE: 'bme_doc_header_title',
 };
 
 const DEFAULT_AI_PROMPT =
@@ -58,6 +69,11 @@ interface StateContextType {
   toolbarCollapsed: boolean;
   labelsHidden: boolean;
   manualEdits: { invoice: string | null; letter: string | null };
+  clientName: string;
+  suratJalanAddress: string;
+  docDate: string;
+  showPaymentInfo: boolean;
+  docHeaderTitle: 'INVOICE' | 'PENAWARAN';
 
   // Auth State
   isLoggedIn: boolean;
@@ -88,6 +104,7 @@ interface StateContextType {
 
   saveToHistory: (title?: string) => void;
   deleteHistoryItem: (id: string) => void;
+  updateHistoryTitle: (id: string, newTitle: string) => void;
   loadHistoryItemToActiveTab: (doc: HistoryDoc) => void;
 
   setManualViewMode: (mode: 'card' | 'table') => void;
@@ -99,6 +116,16 @@ interface StateContextType {
 
   setManualEdit: (type: 'invoice' | 'letter', html: string | null) => void;
   clearManualEdits: () => void;
+
+  updateClientName: (name: string) => void;
+  resetClientName: () => void;
+  updateSuratJalanAddress: (addr: string) => void;
+  resetSuratJalanAddress: () => void;
+  updateDocDate: (date: string) => void;
+  setShowPaymentInfo: (show: boolean) => void;
+  toggleShowPaymentInfo: () => void;
+  setDocHeaderTitle: (title: 'INVOICE' | 'PENAWARAN') => void;
+  toggleDocHeaderTitle: () => void;
 }
 
 const StateContext = createContext<StateContextType | undefined>(undefined);
@@ -212,6 +239,76 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     invoice: null,
     letter: null,
   });
+
+  const [clientName, setClientNameState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CLIENT_NAME);
+      if (saved !== null) return saved;
+    } catch (e) {
+      console.error('Failed to parse clientName', e);
+    }
+    return DEFAULT_CLIENT_NAME;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CLIENT_NAME, clientName);
+  }, [clientName]);
+
+  const [suratJalanAddress, setSuratJalanAddressState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SURAT_JALAN_ADDRESS);
+      if (saved !== null) return saved;
+    } catch (e) {
+      console.error('Failed to parse suratJalanAddress', e);
+    }
+    return DEFAULT_SURAT_JALAN_ADDRESS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SURAT_JALAN_ADDRESS, suratJalanAddress);
+  }, [suratJalanAddress]);
+
+  const [docDate, setDocDateState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DOC_DATE);
+      if (saved !== null) return saved;
+    } catch (e) {
+      console.error('Failed to parse docDate', e);
+    }
+    return '';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DOC_DATE, docDate);
+  }, [docDate]);
+
+  const [showPaymentInfo, setShowPaymentInfoState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SHOW_PAYMENT_INFO);
+      if (saved !== null) return saved === 'true';
+    } catch (e) {
+      console.error('Failed to parse showPaymentInfo', e);
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SHOW_PAYMENT_INFO, String(showPaymentInfo));
+  }, [showPaymentInfo]);
+
+  const [docHeaderTitle, setDocHeaderTitleState] = useState<'INVOICE' | 'PENAWARAN'>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DOC_HEADER_TITLE);
+      if (saved === 'INVOICE' || saved === 'PENAWARAN') return saved;
+    } catch (e) {
+      console.error('Failed to parse docHeaderTitle', e);
+    }
+    return 'INVOICE';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DOC_HEADER_TITLE, docHeaderTitle);
+  }, [docHeaderTitle]);
 
   // Active Tab Derived State
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
@@ -455,6 +552,11 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const doc: HistoryDoc = {
       id: 'doc-' + Date.now(),
       title: titleToSave,
+      clientName,
+      suratJalanAddress,
+      docDate,
+      showPaymentInfo,
+      docHeaderTitle,
       date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       createdAt: Date.now(),
       itemsCount: invoiceItems.length,
@@ -464,15 +566,36 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     setHistoryState((prev) => [doc, ...prev]);
-  }, [activeTab?.title, invoiceItems, manualEdits]);
+  }, [activeTab?.title, invoiceItems, manualEdits, clientName, suratJalanAddress, docDate, showPaymentInfo, docHeaderTitle]);
 
   const deleteHistoryItem = useCallback((id: string) => {
     setHistoryState((prev) => prev.filter((doc) => doc.id !== id));
   }, []);
 
+  const updateHistoryTitle = useCallback((id: string, newTitle: string) => {
+    setHistoryState((prev) =>
+      prev.map((doc) => (doc.id === id ? { ...doc, title: newTitle } : doc))
+    );
+  }, []);
+
   const loadHistoryItemToActiveTab = useCallback((doc: HistoryDoc) => {
     setInvoiceItemsState(doc.items || []);
     updateActiveTabTitle(doc.title);
+    if (doc.clientName) {
+      setClientNameState(doc.clientName);
+    }
+    if (doc.suratJalanAddress) {
+      setSuratJalanAddressState(doc.suratJalanAddress);
+    }
+    if (doc.docDate !== undefined) {
+      setDocDateState(doc.docDate);
+    }
+    if (doc.showPaymentInfo !== undefined) {
+      setShowPaymentInfoState(doc.showPaymentInfo);
+    }
+    if (doc.docHeaderTitle !== undefined) {
+      setDocHeaderTitleState(doc.docHeaderTitle);
+    }
     if (doc.manualEdits) {
       setManualEdits({
         invoice: doc.manualEdits.invoice || null,
@@ -482,6 +605,42 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setManualEdits({ invoice: null, letter: null });
     }
   }, [updateActiveTabTitle]);
+
+  const updateClientName = useCallback((name: string) => {
+    setClientNameState(name);
+  }, []);
+
+  const resetClientName = useCallback(() => {
+    setClientNameState(DEFAULT_CLIENT_NAME);
+  }, []);
+
+  const updateSuratJalanAddress = useCallback((addr: string) => {
+    setSuratJalanAddressState(addr);
+  }, []);
+
+  const resetSuratJalanAddress = useCallback(() => {
+    setSuratJalanAddressState(DEFAULT_SURAT_JALAN_ADDRESS);
+  }, []);
+
+  const updateDocDate = useCallback((date: string) => {
+    setDocDateState(date);
+  }, []);
+
+  const setShowPaymentInfo = useCallback((show: boolean) => {
+    setShowPaymentInfoState(show);
+  }, []);
+
+  const toggleShowPaymentInfo = useCallback(() => {
+    setShowPaymentInfoState((prev) => !prev);
+  }, []);
+
+  const setDocHeaderTitle = useCallback((title: 'INVOICE' | 'PENAWARAN') => {
+    setDocHeaderTitleState(title);
+  }, []);
+
+  const toggleDocHeaderTitle = useCallback(() => {
+    setDocHeaderTitleState((prev) => (prev === 'INVOICE' ? 'PENAWARAN' : 'INVOICE'));
+  }, []);
 
   const setManualViewMode = useCallback((mode: 'card' | 'table') => {
     setManualViewModeState(mode);
@@ -550,6 +709,11 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toolbarCollapsed,
         labelsHidden,
         manualEdits,
+        clientName,
+        suratJalanAddress,
+        docDate,
+        showPaymentInfo,
+        docHeaderTitle,
 
         isLoggedIn,
         adminProfile,
@@ -577,6 +741,7 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         importData,
         saveToHistory,
         deleteHistoryItem,
+        updateHistoryTitle,
         loadHistoryItemToActiveTab,
 
         setManualViewMode,
@@ -588,6 +753,15 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         setManualEdit,
         clearManualEdits,
+        updateClientName,
+        resetClientName,
+        updateSuratJalanAddress,
+        resetSuratJalanAddress,
+        updateDocDate,
+        setShowPaymentInfo,
+        toggleShowPaymentInfo,
+        setDocHeaderTitle,
+        toggleDocHeaderTitle,
       }}
     >
       {children}
